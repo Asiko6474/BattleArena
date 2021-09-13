@@ -132,18 +132,22 @@ namespace BattleArena
         /// </summary>
         void DisplayCurrentScene()
         {
-            if (currentScene == 0)
+            switch (currentScene)
             {
-                DisplayMainMenu();
-            }
-            if (currentScene == 1)
-            {
-                Battle();
-                CheckBattleResults();
-            }
-            if (currentScene == 2)
-            {
-                DisplayRestartMenu();
+                case 0:
+                    GetPlayerName();
+                    break;
+                case 1:
+                    CharacterSelection();
+
+                case 2:
+                    Battle();
+                    CheckBattleResults();
+
+                case 3:
+                    DisplayMainMenu();
+                    break;
+
             }
         }
 
@@ -152,9 +156,18 @@ namespace BattleArena
         /// </summary>
         void DisplayMainMenu()
         {
-            GetPlayerName();
-            CharacterSelection();
-            currentScene = 1;
+            int choice = GetInput("Play Again?", "yes", "no");
+
+            if (choice == 1)
+            {
+                currentScene = 0;
+                currentEnemyIndex = 0;
+                currentEnemy = enemies[currentEnemyIndex];
+            }
+            else
+            {
+                gameOver = true;
+            }
         }
 
         /// <summary>
@@ -166,7 +179,14 @@ namespace BattleArena
             Console.WriteLine("Please enter your name");
             Console.Write("> ");
             player.name = Console.ReadLine();
-            Console.WriteLine("Nice to meet you " + player.name);
+            Console.Clear();
+
+            int choice = GetInput("You've entered " + player.name + ". Are you sure you want to keep this name?", "yes", "no");
+
+            if (choice == 1)
+            {
+                currentScene++;
+            }
         }
 
         /// <summary>
@@ -182,6 +202,7 @@ namespace BattleArena
                 player.health = 50;
                 player.attackPower = 25;
                 player.defensePower = 5;
+                currentScene++;
             }
             else if (input == 2)
             {
@@ -189,6 +210,7 @@ namespace BattleArena
                 player.health = 75;
                 player.attackPower = 15;
                 player.defensePower = 10;
+                currentScene++;
             }
         }
 
@@ -212,13 +234,14 @@ namespace BattleArena
         /// <returns>The amount of damage done to the defender</returns>
         float CalculateDamage(float attackPower, float defensePower)
         {
-            float damage = attackPower - defensePower;
+            return attackPower - defensePower;
+            float damageTaken = attackPower - defensePower;
 
-            if (damage <= 0)
+            if (damageTaken <= 0)
             {
                 damage = 0;
             }
-            return damage;
+            return damageTaken;
         }
 
         /// <summary>
@@ -231,6 +254,12 @@ namespace BattleArena
         {
             float damageTaken = CalculateDamage(attacker.attackPower, defender.defensePower);
             defender.health -= damageTaken;
+
+            if (defender.health < 0)
+            {
+                defender.health = 0;
+            }
+
             return damageTaken;
         }
 
@@ -239,28 +268,32 @@ namespace BattleArena
         /// </summary>
         public void Battle()
         {
-
-            while (currentEnemy.health > 0)
+            float damageDealt = 0;
+            //display player stats
+            DisplayStats(player);
+            //display enemy stats
+            DisplayStats(currentEnemy);
+            int input = GetInput("What do you do?", "Attack", "Dodge");
             {
-                //display player stats
-                DisplayStats(player);
-
-                //display enemy stats
-                DisplayStats(currentEnemy);
-                int input = GetInput("What do you do?", "Attack", "no");
+                if (input == 1)
                 {
-                    if (input == 1)
-                    {
-                        Attack(ref player, ref currentEnemy);
-                        Attack(ref currentEnemy, ref player);
-                    }
-                    if (input == 2)
-                    {
-                        Console.WriteLine("You two sit down and look at each other.");
-                    }
+                    damageDealt = Attack(ref player, ref currentEnemy);
+                    Console.WriteLine("You dealt " + damageDealt + " damage!");
+                    damageDealt = Attack(ref currentEnemy, ref player);
+                    Console.WriteLine("The " + currentEnemy.name + " dealt" + damageDealt, " damage!");
                 }
-
+                if (input == 2)
+                {
+                    Console.WriteLine("You dodged the enemy's attack!");
+                    Console.ReadKey();
+                    Console.Clear();
+                    return;
+                }
+                Console.ReadKey(true);
+                Console.Clear();
             }
+
+
         }
 
         /// <summary>
@@ -269,30 +302,28 @@ namespace BattleArena
         /// </summary>
         void CheckBattleResults()
         {
-            if (currentEnemyIndex >= 2)
+            if (player.health <= 0)
             {
-                currentScene = 2;
+                Console.WriteLine("You were slain....");
+                Console.ReadKey(true);
+                Console.Clear();
+                currentScene = 3;
+            }
+            else if (currentEnemyIndex >= enemies.Length)
+            {
+                currentScene = 3;
+                Console.WriteLine("TOTAL DEFLUFICATION! YOU DEFLUFFED THEM ALL!");
+                return;
             }
 
             else if (currentEnemy.health <= 0)
             {
-                currentEnemyIndex++;
-                currentEnemy = enemies[currentEnemyIndex];
+                Console.WriteLine("You slayed that " + currentEnemy.name);
+                Console.ReadKey(true);
+                Console.Clear();
+                currentScene = 3;
             }
-
-        }
-        void DisplayRestartMenu()
-        {
-            int choice = GetInput("Would you like to play again?", "Yes", "No");
-            if (choice == 1)
-            {
-                currentEnemyIndex = -1;
-                currentScene = 0;
-            }
-            else if (choice == 2)
-            {
-                gameOver = true;
-            }
+            currentEnemy = enemies[currentEnemyIndex];
         }
     }
 }
