@@ -251,6 +251,7 @@ namespace BattleArena
                     if (input == 1)
                     {
                         Attack(ref player, ref currentEnemy);
+                        Attack(ref currentEnemy, ref player);
                     }
                     if (input == 2)
                     {
