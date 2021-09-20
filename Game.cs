@@ -1,31 +1,44 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.IO;
 
 namespace BattleArena
 {
-    /// <summary>
-    /// Represents any entity that exists in game
-    /// </summary>
-    struct Character
+    public enum ItemType
     {
-        public string name;
-        public float health;
-        public float attackPower;
-        public float defensePower;
+        DEFENSE, 
+        ATTACK,
+        NONE
     }
 
+    public enum Scene
+    {
+        STARTMENU,
+        NAMECREATION,
+        CHARACTERSELECTION,
+        BATTLE,
+        RESTARTMENU
+    }
+
+    public struct Item
+    {
+        public string Name;
+        public float StatBoost;
+        public ItemType Type;
+    }
     class Game
     {
-        Character Slime;
-        Character Zombie;
-        Character Sidolis;
-        Character player;
-        Character[] enemies;
-        bool gameOver = false;
-        int currentScene;
-        public int currentEnemyIndex = -1;
-        private Character currentEnemy;
+        private Player _player;
+        private Entity[] _enemies;
+        private Entity _currentEnemy;
+        private bool _gameOver = false;
+        private int _currentScene;
+        private int _currentEnemyIndex = -1;
+        private string _playerName;
+        private Item[] _wizardItems;
+        private Item[] _knightItems;
+
 
         /// <summary>
         /// Function that starts the main game loop
@@ -33,7 +46,7 @@ namespace BattleArena
         public void Run()
         {
             Start();
-            while (!gameOver)
+            while (!_gameOver)
             {
                 Update();
             }
@@ -45,23 +58,42 @@ namespace BattleArena
         /// </summary>
         public void Start()
         {
-            Slime.name = "Slime";
-            Slime.health = 10;
-            Slime.attackPower = 1;
-            Slime.defensePower = 0;
-
-            Zombie.name = "Zombie";
-            Zombie.health = 15;
-            Zombie.attackPower = 5;
-            Zombie.defensePower = 2;
-
-            Sidolis.name = "Lodis's evil cousin, Sidolis";
-            Sidolis.health = 25;
-            Sidolis.attackPower = 10;
-            Sidolis.defensePower = 5;
-
-            enemies = new Character[] { Slime, Zombie, Sidolis };
+            _gameOver = false;
+            _currentScene = 0;
+            InitializeEnemies();
+            InitializeItems();
         }
+
+        public void InitializeItems()
+        {
+            //Wizard Items
+            Item bigWand = new Item { Name = "Big Wand", StatBoost = 5, Type = ItemType.ATTACK};
+            Item bigShield = new Item { Name = "Big Shield", StatBoost = 15, Type = ItemType.DEFENSE};
+
+            //Knight Items
+            Item wand = new Item { Name = "Wand", StatBoost = 1025, Type = ItemType.ATTACK};
+            Item shoes = new Item { Name = "Shoes", StatBoost = 5201, Type = ItemType.DEFENSE };
+
+            //Initialize arrays
+            _wizardItems = new Item[] { bigWand, bigShield };
+            _knightItems = new Item[] { wand, shoes };
+        }
+
+
+        public void InitializeEnemies()
+        {
+            _currentEnemyIndex = 0;
+            Entity Fraawg = new Entity("Frawwg", 10, 15, 34);
+
+            Entity Phil = new Entity("Phil", 15, 34, 20);
+
+            Entity Mike = new Entity("Mike", 34, 20, 10);
+
+            _enemies = new Entity[] { Fraawg, Phil, Mike };
+
+            _currentEnemy = _enemies[_currentEnemyIndex];
+        }
+            
 
         /// <summary>
         /// This function is called every time the game loops.
@@ -79,6 +111,76 @@ namespace BattleArena
             Console.WriteLine("Goodbye");
         }
 
+        public void Save()
+        {
+            //create a new stream writer
+            StreamWriter writer = new StreamWriter("SaveData.txt");
+
+            //Save current enemy index
+            writer.WriteLine(_currentEnemyIndex);
+
+            //Save payer and enemy
+            _player.Save(writer);
+            _currentEnemy.Save(writer);
+
+            //Close Writer When Done Saving
+            writer.Close();
+        }
+
+        public bool Load()
+        {
+            //if file doesn't exist...
+            if (!File.Exists("SaveData.txt"))
+            {
+                //return false
+                return false;
+            }
+            //create a new reader to read from the text file
+            StreamReader reader = new StreamReader("SaveData.txt");
+            // if the first line can't be converted into an integer
+            if (!int.TryParse(reader.ReadLine(), out _currentEnemyIndex))
+            {
+                // return false
+                return false;
+            }
+            //Create a new instance and try to load the player
+            _player = new Player();
+
+            if (!_player.Load(reader))
+            {
+                return false;
+            }
+
+            //create a new instance and try to load the enemy
+            _currentEnemy = new Entity();
+
+            if (!_currentEnemy.Load(reader))
+            {
+                return false;
+            }
+            // Update the array to match the current enemy stats
+            _enemies[_currentEnemyIndex] = _currentEnemy;
+
+            string job = reader.ReadLine();
+
+            if (job == "wizard")
+            {
+                _player = new Player(_wizardItems);
+            }
+            else if (job == "Knight")
+            {
+                _player = new Player(_knightItems);
+            }
+            else
+            {
+                return false;
+            }
+
+            reader.Close();
+
+            return true;
+        }
+
         /// <summary>
         /// Gets an input from the player based on some given decision
         /// </summary>
@@ -86,44 +188,42 @@ namespace BattleArena
         /// <param name="option1">The first option the player can choose</param>
         /// <param name="option2">The second option the player can choose</param>
         /// <returns></returns>
-        int GetInput(string description, string option1, string option2)
+        int GetInput(string description, params string[] options)
         {
             string input = "";
-            int inputReceived = 0;
+            int inputRecieved = -1;
 
-            while (inputReceived != 1 && inputReceived != 2)
-            {//Print options
+            while (inputRecieved == -1)
+            {
+                //print options
                 Console.WriteLine(description);
-                Console.WriteLine("1. " + option1);
-                Console.WriteLine("2. " + option2);
+                for (int i = 0; i< options.Length; i++)
+                {
+                    Console.WriteLine((i + 1) + ". " + options[i]);
+                }
                 Console.Write("> ");
 
-                //Get input from player
                 input = Console.ReadLine();
 
-                //If player selected the first option...
-                if (input == "1" || input == option1)
+                if (int.TryParse(input, out inputRecieved))
                 {
-                    //Set input received to be the first option
-                    inputReceived = 1;
+                    inputRecieved--;
+                    if (inputRecieved < 0 || inputRecieved > -options.Length)
+                    {
+                        inputRecieved = 0;
+                        Console.WriteLine("Invalid Input");
+                        Console.ReadKey(true);
+                    }
                 }
-                //Otherwise if the player selected the second option...
-                else if (input == "2" || input == option2)
-                {
-                    //Set input received to be the second option
-                    inputReceived = 2;
-                }
-                //If neither are true...
                 else
                 {
-                    //...display error message
-                    Console.WriteLine("Invalid Input");
-                    Console.ReadKey();
+                    inputRecieved = -1;
+                    Console.WriteLine("InvalidInput");
+                    Console.ReadKey(true);
                 }
-
                 Console.Clear();
             }
-            return inputReceived;
+            return inputRecieved;
         }
 
         /// <summary>
@@ -131,20 +231,23 @@ namespace BattleArena
         /// </summary>
         void DisplayCurrentScene()
         {
-            switch (currentScene)
+            switch(_currentScene)
             {
-                case 0:
+                case Scene.STARTMENU:
+                    DisplayStartMenu();
+                    break;
+                case Scene.NAMECREATION:
                     GetPlayerName();
                     break;
-                case 1:
+                case Scene.CHARACTERSELECTION:
                     CharacterSelection();
-
-                case 2:
+                    break;
+                case Scene.BATTLE:
                     Battle();
                     CheckBattleResults();
-
-                case 3:
-                    DisplayMainMenu();
+                    break;
+                case Scene.RESTARTMENU:
+                    DisplayRestartMenu();
                     break;
 
             }
@@ -155,17 +258,28 @@ namespace BattleArena
         /// </summary>
         void DisplayMainMenu()
         {
-            int choice = GetInput("Play Again?", "yes", "no");
+            GetPlayerName();
+            CharacterSelection();
+            _currentScene = 1;
+        }
 
-            if (choice == 1)
+        public void DisplayStartMenu()
+        {
+            int choice = GetInput("Welcome to Battle Arena!", "Start New Game", "Load Game");
+
+            if (choice == 0)
             {
-                currentScene = 0;
-                currentEnemyIndex = 0;
-                currentEnemy = enemies[currentEnemyIndex];
+                _currentScene = Scene.NAMECREATION;
             }
-            else
+            else if (choice == 1)
             {
-                gameOver = true;
+                if (Load())
+                {
+                    Console.WriteLine("Load Successfull");
+                    Console.ReadKey(true);
+                    Console.Clear();
+                    _currentScene = Scene.BATTLE;
+                }
             }
         }
 
@@ -177,15 +291,8 @@ namespace BattleArena
         {
             Console.WriteLine("Please enter your name");
             Console.Write("> ");
-            player.name = Console.ReadLine();
-            Console.Clear();
-
-            int choice = GetInput("You've entered " + player.name + ". Are you sure you want to keep this name?", "yes", "no");
-
-            if (choice == 1)
-            {
-                currentScene++;
-            }
+            _playerName = Console.ReadLine();
+            Console.WriteLine("Nice to meet you " + _playerName);
         }
 
         /// <summary>
@@ -195,21 +302,17 @@ namespace BattleArena
         public void CharacterSelection()
         {
             int input = GetInput("please select your class", "Wizard", "Knight");
-            if (input == 1)
+            if (input == 0)
             {
-                Console.WriteLine("You're a wizard " + player.name);
-                player.health = 50;
-                player.attackPower = 25;
-                player.defensePower = 5;
-                currentScene++;
+                Console.WriteLine("You're a wizard " + _playerName);
+                _player = new Player(_playerName, 50, 35, 23, _wizardItems, "Wizard");
+                _currentScene++;
             }
-            else if (input == 2)
+            else if (input == 1)
             {
-                Console.WriteLine("You're a grand knight " + player.name);
-                player.health = 75;
-                player.attackPower = 15;
-                player.defensePower = 10;
-                currentScene++;
+                Console.WriteLine("You're a grand knight " + _playerName, "Knight");
+                _player = new Player(_playerName, 100, 74, 23, _knightItems);
+                _currentScene++;
             }
         }
 
@@ -217,50 +320,29 @@ namespace BattleArena
         /// Prints a characters stats to the console
         /// </summary>
         /// <param name="character">The character that will have its stats shown</param>
-        void DisplayStats(Character character)
+        void DisplayStats(Entity character)
         {
-            Console.WriteLine("name: " + character.name);
-            Console.WriteLine("Health: " + character.health);
-            Console.WriteLine("Attack: " + character.attackPower);
-            Console.WriteLine("Defense: " + character.defensePower);
+            Console.WriteLine("name: " + character.Name);
+            Console.WriteLine("Health: " + character.Health);
+            Console.WriteLine("Attack: " + character.AttackPower);
+            Console.WriteLine("Defense: " + character.DefensePower);
         }
 
-        /// <summary>
-        /// Calculates the amount of damage that will be done to a character
-        /// </summary>
-        /// <param name="attackPower">The attacking character's attack power</param>
-        /// <param name="defensePower">The defending character's defense power</param>
-        /// <returns>The amount of damage done to the defender</returns>
-        float CalculateDamage(float attackPower, float defensePower)
-        {
-            return attackPower - defensePower;
-            float damageTaken = attackPower - defensePower;
 
-            if (damageTaken <= 0)
-            {
-                damage = 0;
-            }
-            return damageTaken;
+        public void DisplayEquipItemMenu()
+        {
+
+            //Get Item Index
+            int choice = GetInput("Select an item to equip", _player.GetItemNames());
+
+            //Equip item at given index
+            if (!_player.TryEquipItem(choice))
+                Console.WriteLine("You couldn't find that item in your bag.");
+
+            //Print feedback
+            Console.WriteLine("You equipped " + _player.CurrentItem.Name + "!");
         }
 
-        /// <summary>
-        /// Deals damage to a character based on an attacker's attack power
-        /// </summary>
-        /// <param name="attacker">The character that initiated the attack</param>
-        /// <param name="defender">The character that is being attacked</param>
-        /// <returns>The amount of damage done to the defender</returns>
-        public float Attack(ref Character attacker, ref Character defender)
-        {
-            float damageTaken = CalculateDamage(attacker.attackPower, defender.defensePower);
-            defender.health -= damageTaken;
-
-            if (defender.health < 0)
-            {
-                defender.health = 0;
-            }
-
-            return damageTaken;
-        }
 
         /// <summary>
         /// Simulates one turn in the current monster fight
@@ -268,31 +350,53 @@ namespace BattleArena
         public void Battle()
         {
             float damageDealt = 0;
-            //display player stats
-            DisplayStats(player);
-            //display enemy stats
-            DisplayStats(currentEnemy);
-            int input = GetInput("What do you do?", "Attack", "Dodge");
+            while (_currentEnemy.Health > 0)
             {
-                if (input == 1)
+                //display player stats
+                DisplayStats(_player);
+
+                //display enemy stats
+                DisplayStats(_currentEnemy);
+                int input = GetInput("What do you do?", "Attack", "Equip Item", "Remove current item", "Save");
                 {
-                    damageDealt = Attack(ref player, ref currentEnemy);
-                    Console.WriteLine("You dealt " + damageDealt + " damage!");
-                    damageDealt = Attack(ref currentEnemy, ref player);
-                    Console.WriteLine("The " + currentEnemy.name + " dealt" + damageDealt, " damage!");
+                    if (input == 0)
+                    {
+                        damageDealt = _player.Attack(_currentEnemy);
+                        
+                    }
+                    else if (input == 1)
+                    {
+                        DisplayEquipItemMenu();
+                        Console.ReadKey(true);
+                        Console.Clear();
+                        return;
+                    }
+                    else if (input == 2)
+                    {
+                        if (!_player.TryremoveCurrentItem())
+                        {
+                            Console.WriteLine("You don't have anything equipped");
+                        }
+                        else
+                        {
+                            Console.WriteLine("You placed the itewm in your bag");
+                        }
+
+                        Console.ReadKey(true);
+                        Console.Clear();
+                        return;
+                    }
+                    else if (input == 2)
+                    {
+                        Save();
+                        Console.WriteLine("You saved the game!");
+
+                        Console.ReadKey(true);
+                        Console.Clear();
+                        return;
+                    }
                 }
-                if (input == 2)
-                {
-                    Console.WriteLine("You dodged the enemy's attack!");
-                    Console.ReadKey();
-                    Console.Clear();
-                    return;
-                }
-                Console.ReadKey(true);
-                Console.Clear();
             }
-
-
         }
 
         /// <summary>
@@ -301,28 +405,30 @@ namespace BattleArena
         /// </summary>
         void CheckBattleResults()
         {
-            if (player.health <= 0)
+            if (_currentEnemyIndex >= 2)
             {
-                Console.WriteLine("You were slain....");
-                Console.ReadKey(true);
-                Console.Clear();
-                currentScene = 3;
-            }
-            else if (currentEnemyIndex >= enemies.Length)
-            {
-                currentScene = 3;
-                Console.WriteLine("TOTAL DEFLUFICATION! YOU DEFLUFFED THEM ALL!");
-                return;
+                _currentScene = Scene.RESTARTMENU;
             }
 
-            else if (currentEnemy.health <= 0)
+            else if (_currentEnemy.Health <= 0)
             {
-                Console.WriteLine("You slayed that " + currentEnemy.name);
-                Console.ReadKey(true);
-                Console.Clear();
-                currentScene = 3;
+                _currentEnemyIndex++;
+                _currentEnemy = _enemies[_currentEnemyIndex];
             }
-            currentEnemy = enemies[currentEnemyIndex];
+
+        }
+        void DisplayRestartMenu()
+        {
+            int choice = GetInput("Would you like to play again?", "Yes", "No");
+            if (choice == 0)
+            {
+                InitializeEnemies();
+                _currentScene = Scene.BATTLE;
+            }
+            else if (choice == 1)
+            {
+                _gameOver = true;
+            }
         }
     }
 }
